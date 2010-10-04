@@ -4,11 +4,16 @@
 #ifndef __BYTEORDER_H
 #define __BYTEORDER_H
 
+#ifdef WIN32
+#include <winsock2.h>
+#else
 /* ntohl and relatives live here */
 #include <arpa/inet.h>
 
 /* Define generic byte swapping functions */
 #include <byteswap.h>
+#endif
+
 #define swap16(x) bswap_16(x)
 #define swap32(x) bswap_32(x)
 #define swap64(x) bswap_64(x)

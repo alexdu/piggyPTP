@@ -164,6 +164,9 @@ typedef struct _PTPUSBEventContainer PTPUSBEventContainer;
 #define PTP_OC_NIKON_SetControlMode	0x90C2
 #define PTP_OC_NIKON_CheckEvent		0x90C7
 #define PTP_OC_NIKON_KeepAlive		0x90C8
+/* CHDK extension */
+#define PTP_OC_CHDK 0x9999
+
 
 /* Proprietary vendor extension operations mask */
 #define PTP_OC_EXTENSION_MASK		0xF000
@@ -872,6 +875,44 @@ const char * ptp_prop_tostr	(PTPParams* params, PTPDevicePropDesc *dpd,
 uint16_t ptp_prop_getcodebyname	(PTPParams* params, char* propname);
 const char* ptp_prop_getvalbyname
 				(PTPParams* params, char* name, uint16_t dpc);
+
+enum {
+  PTP_CHDK_Shutdown = 0,    // param2 is 0 (hard), 1 (soft), 2 (reboot) or 3 (reboot fw update)
+                            // if param2 == 3, then filename of fw update is send as data (empty for default)
+  PTP_CHDK_GetMemory,       // param2 is base address (not NULL; circumvent by taking 0xFFFFFFFF and size+1)
+                            // param3 is size (in bytes)
+                            // return data is memory block
+  PTP_CHDK_SetMemoryLong,   // param2 is address
+                            // param3 is value
+  PTP_CHDK_CallFunction,    // data is array of function pointer and (long) arguments  (max: 10 args)
+                            // return param1 is return value
+  PTP_CHDK_GetPropCase,     // param2 is base id
+                            // param3 is number of properties
+                            // return data is array of longs
+  PTP_CHDK_GetParamData,    // param2 is base id
+                            // param3 is number of parameters
+                            // return data is sequence of strings prefixed by their length (as long)
+  PTP_CHDK_TempData,        // data is data to be stored for later
+  PTP_CHDK_UploadFile,      // data is 4-byte length of filename, followed by filename and contents
+  PTP_CHDK_DownloadFile,    // preceded by PTP_CHDK_TempData with filename
+                            // return data are file contents
+  PTP_CHDK_SwitchMode,      // param2 is 0 (playback) or 1 (record)
+  PTP_CHDK_ExecuteLUA,      // data is script to be executed
+} ptp_chdk_command;
+
+int ptp_chdk_shutdown_hard(PTPParams* params, PTPDeviceInfo* deviceinfo);
+int ptp_chdk_shutdown_soft(PTPParams* params, PTPDeviceInfo* deviceinfo);
+int ptp_chdk_reboot(PTPParams* params, PTPDeviceInfo* deviceinfo);
+int ptp_chdk_reboot_fw_update(char *path, PTPParams* params, PTPDeviceInfo* deviceinfo);
+char* ptp_chdk_get_memory(int start, int num, PTPParams* params, PTPDeviceInfo* deviceinfo);
+int ptp_chdk_set_memory_long(int addr, int val, PTPParams* params, PTPDeviceInfo* deviceinfo);
+int ptp_chdk_call(int *args, int size, int *ret, PTPParams* params, PTPDeviceInfo* deviceinfo);
+int* ptp_chdk_get_propcase(int start, int num, PTPParams* params, PTPDeviceInfo* deviceinfo);
+char* ptp_chdk_get_paramdata(int start, int num, PTPParams* params, PTPDeviceInfo* deviceinfo);
+int ptp_chdk_upload(char *local_fn, char *remote_fn, PTPParams* params, PTPDeviceInfo* deviceinfo);
+int ptp_chdk_download(char *remote_fn, char *local_fn, PTPParams* params, PTPDeviceInfo* deviceinfo);
+int ptp_chdk_switch_mode(int mode, PTPParams* params, PTPDeviceInfo* deviceinfo);
+int ptp_chdk_exec_lua(char *script, PTPParams* params, PTPDeviceInfo* deviceinfo);
 
 
 #endif /* __PTP_H__ */

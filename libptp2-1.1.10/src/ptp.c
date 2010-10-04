@@ -19,13 +19,17 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <config.h>
+#include "config.h"
 #include "ptp.h"
 
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+
+#ifdef WIN32
+#include <winsock2.h>
+#endif
 
 #ifdef ENABLE_NLS
 #  include <libintl.h>
@@ -1689,5 +1693,319 @@ ptp_get_operation_name(PTPParams* params, uint16_t oc)
 		}
 
 	return NULL;
+}
+
+
+/****** CHDK interface ******/
+
+int ptp_chdk_shutdown_hard(PTPParams* params, PTPDeviceInfo* deviceinfo)
+{
+  uint16_t ret;
+  PTPContainer ptp;
+
+  PTP_CNT_INIT(ptp);
+  ptp.Code=PTP_OC_CHDK;
+  ptp.Nparam=2;
+  ptp.Param1=PTP_CHDK_Shutdown;
+  ptp.Param2=0;
+  ret=ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
+  if ( ret != 0x2ff )
+  {
+    ptp_error(params,"unexpected return code 0x%x",ret);
+    return 0;
+  }
+  return 1;
+}
+
+int ptp_chdk_shutdown_soft(PTPParams* params, PTPDeviceInfo* deviceinfo)
+{
+  uint16_t ret;
+  PTPContainer ptp;
+
+  PTP_CNT_INIT(ptp);
+  ptp.Code=PTP_OC_CHDK;
+  ptp.Nparam=2;
+  ptp.Param1=PTP_CHDK_Shutdown;
+  ptp.Param2=1;
+  ret=ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
+  if ( ret != 0x2001 )
+  {
+    ptp_error(params,"unexpected return code 0x%x",ret);
+    return 0;
+  }
+  return 1;
+}
+
+int ptp_chdk_reboot(PTPParams* params, PTPDeviceInfo* deviceinfo)
+{
+  uint16_t ret;
+  PTPContainer ptp;
+
+  PTP_CNT_INIT(ptp);
+  ptp.Code=PTP_OC_CHDK;
+  ptp.Nparam=2;
+  ptp.Param1=PTP_CHDK_Shutdown;
+  ptp.Param2=2;
+  ret=ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
+  if ( ret != 0x2ff )
+  {
+    ptp_error(params,"unexpected return code 0x%x",ret);
+    return 0;
+  }
+  return 1;
+}
+
+int ptp_chdk_reboot_fw_update(char *path, PTPParams* params, PTPDeviceInfo* deviceinfo)
+{
+  uint16_t ret;
+  PTPContainer ptp;
+
+  PTP_CNT_INIT(ptp);
+  ptp.Code=PTP_OC_CHDK;
+  ptp.Nparam=2;
+  ptp.Param1=PTP_CHDK_Shutdown;
+  ptp.Param2=3;
+  ret=ptp_transaction(params, &ptp, PTP_DP_SENDDATA, strlen(path), &path);
+  if ( ret != 0x2ff )
+  {
+    ptp_error(params,"unexpected return code 0x%x",ret);
+    return 0;
+  }
+  return 1;
+}
+
+char* ptp_chdk_get_memory(int start, int num, PTPParams* params, PTPDeviceInfo* deviceinfo)
+{
+  uint16_t ret;
+  PTPContainer ptp;
+  char *buf = NULL;
+
+  PTP_CNT_INIT(ptp);
+  ptp.Code=PTP_OC_CHDK;
+  ptp.Nparam=3;
+  ptp.Param1=PTP_CHDK_GetMemory;
+  ptp.Param2=start;
+  ptp.Param3=num;
+  ret=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, &buf);
+  if ( ret != 0x2001 )
+  {
+    ptp_error(params,"unexpected return code 0x%x",ret);
+    free(buf);
+    return NULL;
+  }
+  return buf;
+}
+
+int ptp_chdk_set_memory_long(int addr, int val, PTPParams* params, PTPDeviceInfo* deviceinfo)
+{
+  uint16_t ret;
+  PTPContainer ptp;
+
+  PTP_CNT_INIT(ptp);
+  ptp.Code=PTP_OC_CHDK;
+  ptp.Nparam=3;
+  ptp.Param1=PTP_CHDK_SetMemoryLong;
+  ptp.Param2=addr;
+  ptp.Param3=val;
+  ret=ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
+  if ( ret != 0x2001 )
+  {
+    ptp_error(params,"unexpected return code 0x%x",ret);
+    return 0;
+  }
+  return 1;
+}
+
+int ptp_chdk_call(int *args, int size, int *ret, PTPParams* params, PTPDeviceInfo* deviceinfo)
+{
+  uint16_t r;
+  PTPContainer ptp;
+
+  PTP_CNT_INIT(ptp);
+  ptp.Code=PTP_OC_CHDK;
+  ptp.Nparam=1;
+  ptp.Param1=PTP_CHDK_CallFunction;
+  r=ptp_transaction(params, &ptp, PTP_DP_SENDDATA, size*sizeof(int), (char **) &args);
+  if ( r != 0x2001 )
+  {
+    ptp_error(params,"unexpected return code 0x%x",r);
+    return 0;
+  }
+  if ( ret )
+  {
+    *ret = ptp.Param1;
+  }
+  return 1;
+}
+
+int* ptp_chdk_get_propcase(int start, int num, PTPParams* params, PTPDeviceInfo* deviceinfo)
+{
+  uint16_t ret;
+  PTPContainer ptp;
+  char *buf = NULL;
+
+  PTP_CNT_INIT(ptp);
+  ptp.Code=PTP_OC_CHDK;
+  ptp.Nparam=3;
+  ptp.Param1=PTP_CHDK_GetPropCase;
+  ptp.Param2=start;
+  ptp.Param3=num;
+  ret=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, &buf);
+  if ( ret != 0x2001 )
+  {
+    ptp_error(params,"unexpected return code 0x%x",ret);
+    free(buf);
+    return NULL;
+  }
+  return (int *) buf;
+}
+
+char* ptp_chdk_get_paramdata(int start, int num, PTPParams* params, PTPDeviceInfo* deviceinfo)
+{
+  uint16_t ret;
+  PTPContainer ptp;
+  char *buf = NULL;
+
+  PTP_CNT_INIT(ptp);
+  ptp.Code=PTP_OC_CHDK;
+  ptp.Nparam=3;
+  ptp.Param1=PTP_CHDK_GetParamData;
+  ptp.Param2=start;
+  ptp.Param3=num;
+  ret=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, &buf);
+  if ( ret != 0x2001 )
+  {
+    ptp_error(params,"unexpected return code 0x%x",ret);
+    free(buf);
+    return NULL;
+  }
+  return buf;
+}
+
+int ptp_chdk_upload(char *local_fn, char *remote_fn, PTPParams* params, PTPDeviceInfo* deviceinfo)
+{
+  uint16_t ret;
+  PTPContainer ptp;
+  char *buf = NULL;
+  FILE *f;
+  int s,l;
+
+  PTP_CNT_INIT(ptp);
+  ptp.Code=PTP_OC_CHDK;
+  ptp.Nparam=1;
+  ptp.Param1=PTP_CHDK_UploadFile;
+
+  f = fopen(local_fn,"rb");
+  if ( f == NULL )
+  {
+    ptp_error(params,"could not open file \'%s\'",local_fn);
+    return 0;
+  }
+
+  fseek(f,0,SEEK_END);
+  s = ftell(f);
+  fseek(f,0,SEEK_SET);
+
+  l = strlen(remote_fn);
+  buf = malloc(4+l+s);
+  memcpy(buf,&l,4);
+  memcpy(buf+4,remote_fn,l);
+  fread(buf+4+l,1,s,f);
+
+  fclose(f);
+
+  ret=ptp_transaction(params, &ptp, PTP_DP_SENDDATA, 4+l+s, &buf);
+
+  free(buf);
+
+  if ( ret != 0x2001 )
+  {
+    ptp_error(params,"unexpected return code 0x%x",ret);
+    return 0;
+  }
+  return 1;
+}
+
+int ptp_chdk_download(char *remote_fn, char *local_fn, PTPParams* params, PTPDeviceInfo* deviceinfo)
+{
+  uint16_t ret;
+  PTPContainer ptp;
+  char *buf = NULL;
+  FILE *f;
+
+  PTP_CNT_INIT(ptp);
+  ptp.Code=PTP_OC_CHDK;
+  ptp.Nparam=1;
+  ptp.Param1=PTP_CHDK_TempData;
+  ret=ptp_transaction(params, &ptp, PTP_DP_SENDDATA, strlen(remote_fn), &remote_fn);
+  if ( ret != 0x2001 )
+  {
+    ptp_error(params,"unexpected return code 0x%x",ret);
+    return 0;
+  }
+
+  PTP_CNT_INIT(ptp);
+  ptp.Code=PTP_OC_CHDK;
+  ptp.Nparam=1;
+  ptp.Param1=PTP_CHDK_DownloadFile;
+
+  ret=ptp_transaction(params, &ptp, PTP_DP_GETDATA, 0, &buf);
+  if ( ret != 0x2001 )
+  {
+    ptp_error(params,"unexpected return code 0x%x",ret);
+    return 0;
+  }
+  
+  f = fopen(local_fn,"wb");
+  if ( f == NULL )
+  {
+    ptp_error(params,"could not open file \'%s\'",local_fn);
+    free(buf);
+    return 0;
+  }
+
+  fwrite(buf,1,ptp.Param1,f);
+  fclose(f);
+
+  free(buf);
+
+  return 1;
+}
+
+int ptp_chdk_switch_mode(int mode, PTPParams* params, PTPDeviceInfo* deviceinfo)
+{
+  uint16_t ret;
+  PTPContainer ptp;
+
+  PTP_CNT_INIT(ptp);
+  ptp.Code=PTP_OC_CHDK;
+  ptp.Nparam=2;
+  ptp.Param1=PTP_CHDK_SwitchMode;
+  ptp.Param2=mode;
+  ret=ptp_transaction(params, &ptp, PTP_DP_NODATA, 0, NULL);
+  if ( ret != 0x2001 )
+  {
+    ptp_error(params,"unexpected return code 0x%x",ret);
+    return 0;
+  }
+  return 1;
+}
+
+int ptp_chdk_exec_lua(char *script, PTPParams* params, PTPDeviceInfo* deviceinfo)
+{
+  uint16_t r;
+  PTPContainer ptp;
+
+  PTP_CNT_INIT(ptp);
+  ptp.Code=PTP_OC_CHDK;
+  ptp.Nparam=1;
+  ptp.Param1=PTP_CHDK_ExecuteLUA;
+  r=ptp_transaction(params, &ptp, PTP_DP_SENDDATA, strlen(script)+1, &script);
+  if ( r != 0x2001 )
+  {
+    ptp_error(params,"unexpected return code 0x%x",r);
+    return 0;
+  }
+  return 1;
 }
 
