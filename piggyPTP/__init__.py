@@ -10,9 +10,16 @@
 # - ctypes_gphoto2.py by Hans Ulrich Niedermann <gp@n-dimensional.de>
 # - piggyphoto, by me :)
 
-ptpcamdll = 'ptpcam.dll'
+import sys, os
+if sys.platform == "win32":
+    ptpcamdll = os.path.join(os.path.dirname(__file__), '..', 'libptp2-chdk-win32/ptpcam.dll')
+else:
+    # don't know how to compile that...
+    ptpcamdll = os.path.join(os.path.dirname(__file__), '..', 'libptp2-chdk-linux/ptpcam.so')
 
 import ctypes
 PD = ctypes.CDLL(ptpcamdll)
 
 PD.help()
+PD.list_devices()
+
